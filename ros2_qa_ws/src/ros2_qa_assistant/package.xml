@@ -1,0 +1,24 @@
+<?xml version="1.0"?>
+<package format="3">
+  <name>ros2_qa_assistant</name>
+  <version>0.1.0</version>
+  <description>ROS2 Rolling 教育机器人问答系统：Web交互、本地知识库、外部API拓展、RViz 可视化、多节点架构。</description>
+  <maintainer email="maintainer@example.com">XiuandQi</maintainer>
+  <license>MIT</license>
+
+  <buildtool_depend>ament_cmake</buildtool_depend>
+  <buildtool_depend>ament_python</buildtool_depend>
+
+  <exec_depend>rclpy</exec_depend>
+  <exec_depend>std_msgs</exec_depend>
+  <exec_depend>std_srvs</exec_depend>
+  <exec_depend>visualization_msgs</exec_depend>
+  <!-- web 前端通过 rosbridge 使用 WebSocket 与 ROS 通信；此包不直接依赖 rosbridge_server -->
+
+  <test_depend>ament_lint_auto</test_depend>
+  <test_depend>ament_lint_common</test_depend>
+
+  <export>
+    <build_type>ament_python</build_type>
+  </export>
+</package>

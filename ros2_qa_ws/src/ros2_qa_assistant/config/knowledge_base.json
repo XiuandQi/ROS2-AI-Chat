@@ -1,0 +1,36 @@
+[
+  {
+    "keywords": [
+      {"word": "ROS", "weight": 1.0},
+      {"word": "机器人操作系统", "weight": 1.0},
+      {"word": "Robot Operating System", "weight": 0.8}
+    ],
+    "answer": "ROS是机器人操作系统(ROS, Robot Operating System)，提供通信、工具和库以简化机器人开发。"
+  },
+  {
+    "keywords": [
+      {"word": "ROS2", "weight": 1.0},
+      {"word": "ROS1", "weight": 0.8},
+      {"word": "区别", "weight": 0.9},
+      {"word": "差异", "weight": 0.9}
+    ],
+    "answer": "ROS2基于ROS，支持多平台实时性与安全性，节点、话题、服务等概念延续但实现更现代。"
+  },
+  {
+    "keywords": [
+      {"word": "话题", "weight": 1.0},
+      {"word": "topic", "weight": 1.0},
+      {"word": "列表", "weight": 0.7},
+      {"word": "查看", "weight": 0.6}
+    ],
+    "answer": "使用命令：ros2 topic list"
+  },
+  {
+    "keywords": [
+      {"word": "RViz", "weight": 1.0},
+      {"word": "可视化", "weight": 0.9},
+      {"word": "启动", "weight": 0.6}
+    ],
+    "answer": "运行命令：ros2 run rviz2 rviz2，然后添加Marker显示订阅/qa_visualization话题。"
+  }
+]

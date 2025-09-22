@@ -1,0 +1,21 @@
+rosbridge_websocket:
+  ros__parameters:
+    # 全局默认QoS（可选）
+    default_qos:
+      durability: transient_local
+      reliability: reliable
+      history: keep_last
+      depth: 10
+
+    # 针对具体话题覆盖（不同版本rosbridge可能不支持精确到topic的QoS；如不支持则依赖default_qos）
+    topics:
+      web_question_input:
+        durability: transient_local
+        reliability: reliable
+        history: keep_last
+        depth: 10
+      web_answer_output:
+        durability: transient_local
+        reliability: reliable
+        history: keep_last
+        depth: 10

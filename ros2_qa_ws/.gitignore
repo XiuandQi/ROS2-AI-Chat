@@ -1,0 +1,7 @@
+build/
+install/
+log/
+*.pyc
+__pycache__/
+.DS_Store
+src/logs/

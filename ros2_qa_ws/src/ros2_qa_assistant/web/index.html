@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="zh-cn">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>ROS2 教育问答助手</title>
+    <link rel="stylesheet" href="style.css">
+  </head>
+  <body>
+    <div class="container">
+      <h1>ROS2 教育问答助手</h1>
+      <div class="conn">
+        <label>WebSocket 地址</label>
+        <input id="ws-url" value="ws://localhost:9090" />
+        <button id="connect-btn">连接</button>
+        <span id="status">未连接</span>
+      </div>
+      <div class="qa">
+        <textarea id="question" placeholder="请输入你的问题，例如：ROS是什么"></textarea>
+        <button id="send-btn">发送</button>
+      </div>
+      <div class="answer">
+        <h3>系统答案</h3>
+        <pre id="answer-box"></pre>
+      </div>
+    </div>
+
+    <!-- Prefer official roslib.js from CDN; fallback to local stub if offline -->
+    <!-- <script src="https://cdn.jsdelivr.net/npm/roslib/build/roslib.min.js"></script> -->
+    <script src="https://cdn.bootcdn.net/ajax/libs/roslibjs/1.1.0/roslib.js"></script>
+    <!-- <script src="roslib.min.js"></script> -->
+    <!-- <script src="roslib.js"></script> -->
+    <script>window.ROSLIB || document.write('<script src="roslib.min.js"><\/script>')</script>
+    <script src="ros2_qa.js"></script>
+  </body>
+  </html>
