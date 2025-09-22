@@ -98,9 +98,6 @@ fi
 
 cleanup() {
   echo "\n[信息] 正在关闭..."
-
-cleanup() {
-  echo "\n[信息] 正在关闭..."
   
   # 杀死相关的ROS2节点
   echo "[信息] 停止QA助手节点..."

@@ -390,5 +390,5 @@ ros2 run rviz2 rviz2
   - 每个keyword对象必须包含word和weight字段
 - 浏览器控制台检查 WebSocket 错误与 CORS 提示。
 
-## 许可证
-MIT
+## 作者
+Made by Xiu-Qi

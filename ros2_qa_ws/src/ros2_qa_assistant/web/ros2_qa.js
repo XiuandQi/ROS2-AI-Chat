@@ -5,31 +5,158 @@
   let connected = false;
   let connecting = false;
   const pendingQueue = [];
+  let currentTypingMessage = null;
 
-  function byId(id){ return document.getElementById(id); }
+  // DOM元素
+  const elements = {
+    statusDot: () => document.getElementById('status-dot'),
+    statusText: () => document.getElementById('status-text'),
+    connectBtn: () => document.getElementById('connect-btn'),
+    sendBtn: () => document.getElementById('send-btn'),
+    wsUrl: () => document.getElementById('ws-url'),
+    question: () => document.getElementById('question'),
+    chatMessages: () => document.getElementById('chat-messages'),
+    settingsPanel: () => document.getElementById('settings-panel'),
+    settingsBtn: () => document.getElementById('settings-btn'),
+    clearChatBtn: () => document.getElementById('clear-chat')
+  };
 
-  function connect(){
-    const url = byId('ws-url').value.trim();
+  // 工具函数
+  function scrollToBottom() {
+    const chatMessages = elements.chatMessages();
+    chatMessages.scrollTop = chatMessages.scrollHeight;
+  }
+
+  function updateConnectionStatus(status, text) {
+    const statusDot = elements.statusDot();
+    const statusText = elements.statusText();
+    
+    statusDot.className = `status-dot ${status}`;
+    statusText.textContent = text;
+  }
+
+  function addMessage(content, type = 'ai', isTyping = false) {
+    const chatMessages = elements.chatMessages();
+    const messageDiv = document.createElement('div');
+    messageDiv.className = `message-bubble ${type}-message`;
+    
+    if (isTyping) {
+      messageDiv.innerHTML = `
+        <div class="message-content typing-indicator">
+          <span>AI正在思考</span>
+          <div class="typing-dots">
+            <span></span>
+            <span></span>
+            <span></span>
+          </div>
+        </div>
+      `;
+    } else {
+      const messageContent = document.createElement('div');
+      messageContent.className = 'message-content';
+      messageContent.innerHTML = content;
+      messageDiv.appendChild(messageContent);
+    }
+    
+    chatMessages.appendChild(messageDiv);
+    scrollToBottom();
+    
+    return messageDiv;
+  }
+
+  function typewriterEffect(element, text, speed = 50) {
+    return new Promise((resolve) => {
+      element.innerHTML = '';
+      let i = 0;
+      
+      function typeChar() {
+        if (i < text.length) {
+          const char = text.charAt(i);
+          const span = document.createElement('span');
+          span.textContent = char;
+          span.className = 'typing-effect';
+          element.appendChild(span);
+          i++;
+          setTimeout(typeChar, speed);
+        } else {
+          // 移除打字效果类
+          setTimeout(() => {
+            element.innerHTML = text;
+            resolve();
+          }, 500);
+        }
+      }
+      
+      typeChar();
+    });
+  }
+
+  function clearChat() {
+    const chatMessages = elements.chatMessages();
+    chatMessages.innerHTML = `
+      <div class="welcome-message">
+        <div class="message-bubble ai-message">
+          <div class="message-content">
+            <p>对话已清空！有什么问题可以继续问我。</p>
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
+  function toggleSettings() {
+    const settingsPanel = elements.settingsPanel();
+    settingsPanel.classList.toggle('show');
+  }
+
+  function autoResizeTextarea() {
+    const textarea = elements.question();
+    textarea.style.height = 'auto';
+    textarea.style.height = Math.min(textarea.scrollHeight, 120) + 'px';
+  }
+
+  function connect() {
+    const url = elements.wsUrl().value.trim();
     if (!url) return;
+    
     if (window.ROSLIB && window.ROSLIB.__stub) {
-      byId('status').textContent = '库未加载：请联网或替换 web/roslib.min.js 为官方版本';
+      updateConnectionStatus('error', '库未加载：请联网或替换roslib.min.js');
       return;
     }
-  if (connecting || connected) return;
-  connecting = true;
-  ros = new window.ROSLIB.Ros({ url });
-    byId('status').textContent = '连接中';
+
+    if (connecting || connected) return;
+    
+    connecting = true;
+    updateConnectionStatus('connecting', '连接中...');
+    elements.connectBtn().disabled = true;
+
+    ros = new window.ROSLIB.Ros({ url });
 
     ros.on('connection', function(){
       connecting = false;
       connected = true;
-      byId('status').textContent = '已连接';
-      byId('send-btn').disabled = false;
+      updateConnectionStatus('connected', '已连接');
+      elements.sendBtn().disabled = false;
+      elements.connectBtn().disabled = false;
+      elements.connectBtn().innerHTML = '<i class="fas fa-check"></i><span>已连接</span>';
+      
       console.log('[ros2-qa] WebSocket connected successfully');
-      // 显式通过协议向rosbridge声明QoS，确保ROS2侧使用兼容QoS创建发布者/订阅者
+      
+      // 隐藏设置面板
+      elements.settingsPanel().classList.remove('show');
+      
+      // 添加连接成功消息
+      addMessage('<p>成功连接到ROS系统！现在可以开始提问了。</p>');
+
+      // QoS配置
       try {
-        const qosProfile = { durability: 'transient_local', reliability: 'reliable', history: 'keep_last', depth: 10 };
-        // 为 /web_question_input 创建带QoS的发布者（rosbridge在ROS2侧作为publisher）
+        const qosProfile = { 
+          durability: 'transient_local', 
+          reliability: 'reliable', 
+          history: 'keep_last', 
+          depth: 10 
+        };
+
         if (ros && typeof ros.callOnConnection === 'function') {
           ros.callOnConnection({
             op: 'advertise',
@@ -37,106 +164,162 @@
             type: 'std_msgs/String',
             qos: qosProfile
           });
-          console.log('[ros2-qa] advertised /web_question_input with QoS', qosProfile);
-          // 为 /web_answer_output 创建带QoS的订阅者（rosbridge在ROS2侧作为subscriber）
-          ros.callOnConnection({
-            op: 'subscribe',
-            topic: '/web_answer_output',
-            type: 'std_msgs/String',
-            qos: qosProfile
-          });
-          console.log('[ros2-qa] subscribed /web_answer_output with QoS', qosProfile);
+          
+          // 注意：不在这里订阅，避免与后面的webAnswerTopic.subscribe重复
         }
       } catch (e) {
-        console.warn('[ros2-qa] explicit QoS advertise/subscribe failed:', e);
+        console.warn('[ros2-qa] QoS setup failed:', e);
       }
-      
-      // 使用兼容rosbridge的QoS配置（若roslibjs支持，会一并带上；已通过上面callOnConnection强制声明）
-      const qosOptions = { qos: { durability: 'transient_local', reliability: 'reliable', history: 'keep_last', depth: 10 } };
-      
+
+      // 创建话题
+      const qosOptions = { 
+        qos: { 
+          durability: 'transient_local', 
+          reliability: 'reliable', 
+          history: 'keep_last', 
+          depth: 10 
+        } 
+      };
+
       webQuestionTopic = new window.ROSLIB.Topic({ 
         ros, 
         name: '/web_question_input', 
         messageType: 'std_msgs/String',
         ...qosOptions
       });
-      try { if (typeof webQuestionTopic.advertise === 'function') webQuestionTopic.advertise(); } catch (e) { console.warn('[ros2-qa] advertise failed:', e); }
-      console.log('[ros2-qa] webQuestionTopic created with QoS: transient_local, reliable');
-      
-  webAnswerTopic = new window.ROSLIB.Topic({ 
-    ros, 
-    name: '/web_answer_output', 
-    messageType: 'std_msgs/String',
-    qos: {
-      durability: 'transient_local',
-      reliability: 'reliable'
-    }
-  });
-  webAnswerTopic.subscribe(function(msg){ 
-    console.log('[ros2-qa] received answer:', msg.data);
-    byId('answer-box').textContent = msg.data || ''; 
-  });
-  console.log('[ros2-qa] webAnswerTopic subscribed with QoS: transient_local, reliable');
-  
-  // Fallback subscribe directly to /answer in case the bridge node is not running
-  const directAnswerTopic = new window.ROSLIB.Topic({ ros, name: '/answer', messageType: 'std_msgs/String' });
-  directAnswerTopic.subscribe(function(msg){ 
-    console.log('[ros2-qa] received direct answer:', msg.data);
-    byId('answer-box').textContent = msg.data || ''; 
-  });
-      console.log('[ros2-qa] connected to', url);
-      // Flush any pending messages
+
+      webAnswerTopic = new window.ROSLIB.Topic({ 
+        ros, 
+        name: '/web_answer_output', 
+        messageType: 'std_msgs/String',
+        ...qosOptions
+      });
+
+      webAnswerTopic.subscribe(function(msg){ 
+        const timestamp = new Date().toISOString();
+        console.log(`[ros2-qa] ${timestamp} received answer:`, msg.data);
+        console.log('[ros2-qa] Call stack:', new Error().stack);
+        
+        // 移除打字指示器
+        if (currentTypingMessage) {
+          currentTypingMessage.remove();
+          currentTypingMessage = null;
+        }
+
+        const answer = msg.data || '抱歉，我现在无法回答这个问题。';
+        const messageElement = addMessage('');
+        const contentElement = messageElement.querySelector('.message-content');
+        
+        // 使用打字机效果显示答案
+        typewriterEffect(contentElement, answer, 30);
+      });
+
+      // 发送待处理的消息
       while (pendingQueue.length > 0 && webQuestionTopic) {
         const text = pendingQueue.shift();
-        try { webQuestionTopic.publish(new window.ROSLIB.Message({ data: text })); } catch (e) { console.error('flush publish failed', e); }
+        try { 
+          webQuestionTopic.publish(new window.ROSLIB.Message({ data: text }));
+          currentTypingMessage = addMessage('', 'ai', true);
+        } catch (e) { 
+          console.error('flush publish failed', e); 
+        }
       }
     });
+
     ros.on('error', function(error){
-      connecting = false; connected = false;
-      byId('send-btn').disabled = true;
+      connecting = false; 
+      connected = false;
+      updateConnectionStatus('error', '连接失败');
+      elements.sendBtn().disabled = true;
+      elements.connectBtn().disabled = false;
+      elements.connectBtn().innerHTML = '<i class="fas fa-plug"></i><span>重新连接</span>';
+      
       console.error('[ros2-qa] WebSocket error:', error);
-      byId('status').textContent = '连接错误：检查 rosbridge 是否运行，端口是否开放（默认 9090）';
+      addMessage('<p>连接失败！请检查：</p><ul><li>rosbridge是否运行</li><li>端口9090是否开放</li><li>网络连接是否正常</li></ul>', 'ai');
     });
-    ros.on('close', function(event){
-      connecting = false; connected = false;
-      byId('send-btn').disabled = true;
-      console.log('[ros2-qa] WebSocket closed:', event);
-      byId('status').textContent = '已断开：请确认 rosbridge 正在运行，并确保 WebSocket 地址正确';
+
+    ros.on('close', function(){
+      connecting = false; 
+      connected = false;
+      updateConnectionStatus('error', '连接断开');
+      elements.sendBtn().disabled = true;
+      elements.connectBtn().disabled = false;
+      elements.connectBtn().innerHTML = '<i class="fas fa-plug"></i><span>重新连接</span>';
+      
+      console.log('[ros2-qa] WebSocket closed');
+      addMessage('<p>与ROS系统的连接已断开。</p>', 'ai');
     });
   }
 
-  function send(){
-    const q = byId('question').value.trim();
-    if (!q) return;
+  function sendQuestion() {
+    const questionText = elements.question().value.trim();
+    if (!questionText) return;
+
+    // 添加用户消息
+    addMessage(questionText, 'user');
+    
+    // 清空输入框
+    elements.question().value = '';
+    autoResizeTextarea();
+
     if (!connected || !webQuestionTopic) {
-      // queue and try connect automatically
-      if (pendingQueue.length < 5) pendingQueue.push(q);
-      byId('status').textContent = '未连接，正在尝试连接后发送...';
-      connect();
+      pendingQueue.push(questionText);
+      addMessage('<p>消息已加入队列，等待连接建立后发送...</p>', 'ai');
       return;
     }
-    const msg = new window.ROSLIB.Message({ data: q });
+
     try {
-      webQuestionTopic.publish(msg);
-  console.log('[ros2-qa] published question:', q);
-  byId('status').textContent = '已发送，等待回答...';
-      // Fallback: also publish directly to /question in case the bridge node is not running
-      try {
-        const directQTopic = new window.ROSLIB.Topic({ ros, name: '/question', messageType: 'std_msgs/String' });
-        directQTopic.publish(new window.ROSLIB.Message({ data: q }));
-      } catch (e) { /* ignore fallback errors */ }
+      webQuestionTopic.publish(new window.ROSLIB.Message({ data: questionText }));
+      console.log('[ros2-qa] sent question:', questionText);
+      
+      // 添加打字指示器
+      currentTypingMessage = addMessage('', 'ai', true);
+      
+      // 10秒后如果没有回复，显示超时消息
+      setTimeout(() => {
+        if (currentTypingMessage && document.body.contains(currentTypingMessage)) {
+          currentTypingMessage.remove();
+          currentTypingMessage = null;
+          addMessage('<p>响应超时，请检查ROS系统状态或重试。</p>', 'ai');
+        }
+      }, 10000);
+      
     } catch (e) {
-      console.error('[ros2-qa] publish failed', e);
-      byId('status').textContent = '发送失败：请检查控制台错误信息';
+      console.error('[ros2-qa] send failed:', e);
+      addMessage('<p>发送失败，请重试。</p>', 'ai');
     }
   }
 
-  byId('connect-btn').addEventListener('click', connect);
-  byId('send-btn').addEventListener('click', send);
-  // allow Ctrl+Enter to send
-  byId('question').addEventListener('keydown', function(e){
-    if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') send();
+  // 事件监听器
+  document.addEventListener('DOMContentLoaded', function() {
+    // 连接按钮
+    elements.connectBtn().addEventListener('click', connect);
+    
+    // 发送按钮
+    elements.sendBtn().addEventListener('click', sendQuestion);
+    
+    // 设置按钮
+    elements.settingsBtn().addEventListener('click', toggleSettings);
+    
+    // 清除对话按钮
+    elements.clearChatBtn().addEventListener('click', clearChat);
+    
+    // 输入框事件
+    const questionInput = elements.question();
+    questionInput.addEventListener('input', autoResizeTextarea);
+    questionInput.addEventListener('keydown', function(e) {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        sendQuestion();
+      }
+    });
+
+    // WebSocket URL输入框回车连接
+    elements.wsUrl().addEventListener('keydown', function(e) {
+      if (e.key === 'Enter') {
+        connect();
+      }
+    });
   });
-  // disable send by default until connected
-  byId('send-btn').disabled = true;
+
 })();
