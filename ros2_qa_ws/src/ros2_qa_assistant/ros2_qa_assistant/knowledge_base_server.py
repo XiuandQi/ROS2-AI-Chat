@@ -34,9 +34,6 @@ class KnowledgeBaseServer(Node):
         # 内部查询话题订阅
         if kb_query_topic != question_topic:
             self.create_subscription(String, kb_query_topic, self._on_question, 10)
-        self.get_logger().info(
-            f'知识库服务器启动完成 - 服务: {self._service_name}, 知识库: {self._kb_path}'
-        )
         self.qa_logger.log_node_start(
             'knowledge_base_server',
             f'Service: {self._service_name}, KB path: {self._kb_path}, Subscribed to: {question_topic}'
@@ -44,7 +41,6 @@ class KnowledgeBaseServer(Node):
 
     def _on_question(self, msg: String) -> None:
         self._last_question = msg.data.strip()
-        self.get_logger().debug(f'缓存问题: {self._last_question}')
         self.qa_logger.log_info('knowledge_base_server', f'Cached question: {self._last_question}')
 
     def _resolve_path(self, path_str: str) -> Path:
@@ -73,7 +69,6 @@ class KnowledgeBaseServer(Node):
         return (Path.cwd() / p).resolve()
 
     def _find_best_answer(self, question: str) -> Optional[str]:
-        """基于关键词匹配和每个关键词的权重找到最佳答案"""
         if not question or not self._kb_entries:
             return None
             
@@ -172,10 +167,8 @@ class KnowledgeBaseServer(Node):
                         'answer': answer
                     })
             
-            self.get_logger().info(f'已加载 {len(self._kb_entries)} 个知识库条目')
             self.qa_logger.log_info('knowledge_base_server', f'Successfully loaded {len(self._kb_entries)} KB entries from {self._kb_path}')
         except Exception as e:
-            self.get_logger().error(f'加载知识库失败 {self._kb_path}: {e}')
             self.qa_logger.log_error('knowledge_base_server', f'Failed to load knowledge base from {self._kb_path}: {e}')
             self._kb_entries = []
 
@@ -196,7 +189,6 @@ class KnowledgeBaseServer(Node):
             response.message = answer
             self.qa_logger.log_service_call('knowledge_base_server', '/query_knowledge_base', '', f'Hit - found answer: {answer}')
         
-        self.get_logger().info(f'知识库查询 "{question}" -> {"命中" if response.success else "未找到"}')
         return response
 
 

@@ -54,7 +54,6 @@
   },
   {
     "keywords": [
-      {"word": "你", "weight":1.0},
       {"word": "怎么", "weight":0.9},
       {"word": "如何", "weight":0.9},
       {"word": "工作", "weight":0.8},

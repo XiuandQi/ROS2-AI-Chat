@@ -1,5 +1,5 @@
 from typing import Optional
-
+import requests
 import rclpy
 from rclpy.node import Node
 from std_msgs.msg import String
@@ -28,9 +28,6 @@ class QACoreNode(Node):
         self.kb_query_pub_ = self.create_publisher(String, kb_query_topic, 10)
         self.kb_client_ = self.create_client(SetBool, kb_service)
 
-        self.get_logger().info(
-            f'QA核心节点启动完成 - 订阅: {question_topic}, 发布: {answer_topic}, 知识库服务: {kb_service}'
-        )
         self.qa_logger.log_node_start(
             'qa_core_node', 
             f'Subscribed to {question_topic}, Publishing to {answer_topic}, KB Service: {kb_service}'
@@ -40,7 +37,6 @@ class QACoreNode(Node):
         question = msg.data.strip()
         if not question:
             return
-        self.get_logger().info(f'收到问题: {question}')
         self.qa_logger.log_message_received('qa_core_node', '/question', question)
         
         # 发布到内部查询话题传递问题文本
@@ -54,7 +50,6 @@ class QACoreNode(Node):
             
         # 等待知识库服务
         if not self.kb_client_.wait_for_service(timeout_sec=2.0):
-            self.get_logger().warning('知识库服务不可用')
             self.qa_logger.log_warning('qa_core_node', 'Knowledge base service unavailable')
             self._publish_fallback_answer(question)
             return
@@ -73,7 +68,6 @@ class QACoreNode(Node):
                 else:
                     self.qa_logger.log_service_call('qa_core_node', '/query_knowledge_base', '', 'Failed or no success')
             except Exception as e:
-                self.get_logger().error(f'知识库查询失败: {e}')
                 self.qa_logger.log_error('qa_core_node', f'KB query failed: {e}')
             if not ans:
                 ans = self.query_external_api(q)
@@ -82,7 +76,6 @@ class QACoreNode(Node):
             out = String()
             out.data = ans
             self.answer_pub_.publish(out)
-            self.get_logger().info(f'发布答案: {ans}')
             self.qa_logger.log_message_published('qa_core_node', '/answer', ans)
 
         future.add_done_callback(_on_done)
@@ -112,14 +105,42 @@ class QACoreNode(Node):
         out = String()
         out.data = ans
         self.answer_pub_.publish(out)
-        self.get_logger().info(f'发布答案: {ans}')
         self.qa_logger.log_message_published('qa_core_node', '/answer', ans)
 
     def query_external_api(self, question: str) -> Optional[str]:
-        # 外部API接口（暂未配置）
-        self.get_logger().info('未配置外部API，跳过')
-        self.qa_logger.log_info('qa_core_node', 'No external API configured. Skipping external query')
-        return None
+        self.url = 'https://spark-api-open.xf-yun.com/v2/chat/completions'
+        self.data = {
+            "max_tokens" : 32768,
+            "top_k" : 6,
+            "temperature" : 1.2,
+            "messages" : [
+                {"role":"system",
+                 "content":""
+                },
+                {
+                    "role":"user",
+                    "content": question
+                }
+            ],
+            "model" : "x1",
+            "tools" : [
+                {
+                    "web_search" : {
+                        "search_mode" : "normal",
+                        "enable" : False
+                    },
+                    "type" : "web_search"
+                }
+            ]
+        }
+        self.data["stream"] = False
+        self.header = {
+            "Authorization": "Bearer iFUlrMnNwaCqtmiQAMBj:BqdmYdEiejRZzfrwMXGD"
+        }
+        self.response = requests.post(url=self.url, headers=self.header, json=self.data, stream=False)
+        self.response.encoding = 'utf-8'
+        self.text = self.response.json().get('choices')[0]['message']['content']
+        return self.text if self.text else None
 
 
 def main(args=None):

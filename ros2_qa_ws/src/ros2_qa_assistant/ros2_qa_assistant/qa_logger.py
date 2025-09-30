@@ -18,7 +18,6 @@ class QALogger:
         return cls._instance
     
     def _setup_logger(self):
-        """设置日志配置"""
         # 创建logs目录在src中
         # 尝试多种方式找到workspace的src目录
         current_file = Path(__file__).resolve()
@@ -84,26 +83,21 @@ class QALogger:
         self._logger.propagate = False
     
     def log_node_start(self, node_name: str, details: str = ""):
-        """记录节点启动"""
         message = f"Node '{node_name}' started"
         if details:
             message += f" - {details}"
         self._logger.info(message)
     
     def log_node_stop(self, node_name: str):
-        """记录节点停止"""
         self._logger.info(f"Node '{node_name}' stopped")
     
     def log_message_received(self, node_name: str, topic: str, message: str):
-        """记录接收到的消息"""
         self._logger.info(f"[{node_name}] Received on '{topic}': {message}")
     
     def log_message_published(self, node_name: str, topic: str, message: str):
-        """记录发布的消息"""
         self._logger.info(f"[{node_name}] Published to '{topic}': {message}")
     
     def log_service_call(self, node_name: str, service: str, request: str = "", response: str = ""):
-        """记录服务调用"""
         message = f"[{node_name}] Service call '{service}'"
         if request:
             message += f" - Request: {request}"
@@ -112,18 +106,14 @@ class QALogger:
         self._logger.info(message)
     
     def log_error(self, node_name: str, error_msg: str):
-        """记录错误"""
         self._logger.error(f"[{node_name}] ERROR: {error_msg}")
     
     def log_warning(self, node_name: str, warning_msg: str):
-        """记录警告"""
         self._logger.warning(f"[{node_name}] WARNING: {warning_msg}")
     
     def log_info(self, node_name: str, info_msg: str):
-        """记录信息"""
         self._logger.info(f"[{node_name}] {info_msg}")
 
 
 def get_qa_logger() -> QALogger:
-    """获取QA日志器实例"""
     return QALogger()

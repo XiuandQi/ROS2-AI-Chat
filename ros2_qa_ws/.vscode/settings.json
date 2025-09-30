@@ -1,0 +1,10 @@
+{
+    "python.autoComplete.extraPaths": [
+        "/home/xiu-qi/Desktop/ros/ros2_qa_ws/install/ros2_qa_assistant/lib/python3.12/site-packages",
+        "/opt/ros/rolling/lib/python3.12/site-packages"
+    ],
+    "python.analysis.extraPaths": [
+        "/home/xiu-qi/Desktop/ros/ros2_qa_ws/install/ros2_qa_assistant/lib/python3.12/site-packages",
+        "/opt/ros/rolling/lib/python3.12/site-packages"
+    ]
+}

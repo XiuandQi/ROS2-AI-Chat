@@ -53,7 +53,6 @@ class OutputManagerNode(Node):
         marker.pose.position.z = 1.0
         marker.text = text
         self.marker_pub_.publish(marker)
-        self.get_logger().info('已发布答案到Web和RViz')
         self.qa_logger.log_info('output_manager_node', 'Published answer to web and RViz marker')
 
 
