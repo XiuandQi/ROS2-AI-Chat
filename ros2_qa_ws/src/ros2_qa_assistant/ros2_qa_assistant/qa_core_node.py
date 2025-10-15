@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import Optional, List, Dict
 import requests
 import rclpy
 from rclpy.node import Node
@@ -12,26 +12,55 @@ class QACoreNode(Node):
         super().__init__('qa_core_node')
         self.qa_logger = get_qa_logger()
         
+        self.conversation_history: List[Dict[str, str]] = []
+        self.max_history_length = 10
+        
         self.declare_parameter('question_topic', '/question')
         self.declare_parameter('answer_topic', '/answer')
         self.declare_parameter('kb_service', '/query_knowledge_base')
         self.declare_parameter('kb_query_topic', '/kb_query')
+        self.declare_parameter('enable_context', True)
+        self.declare_parameter('max_history_length', 10)
 
         question_topic = self.get_parameter('question_topic').get_parameter_value().string_value
         answer_topic = self.get_parameter('answer_topic').get_parameter_value().string_value
         kb_service = self.get_parameter('kb_service').get_parameter_value().string_value
         kb_query_topic = self.get_parameter('kb_query_topic').get_parameter_value().string_value
+        self.enable_context = self.get_parameter('enable_context').get_parameter_value().bool_value
+        self.max_history_length = self.get_parameter('max_history_length').get_parameter_value().integer_value
 
         self.answer_pub_ = self.create_publisher(String, answer_topic, 10)
         self.create_subscription(String, question_topic, self._on_question, 10)
-        # 发布到内部查询话题
         self.kb_query_pub_ = self.create_publisher(String, kb_query_topic, 10)
         self.kb_client_ = self.create_client(SetBool, kb_service)
+        self.create_service(SetBool, '/clear_context', self._clear_context_callback)
 
         self.qa_logger.log_node_start(
             'qa_core_node', 
-            f'Subscribed to {question_topic}, Publishing to {answer_topic}, KB Service: {kb_service}'
+            f'Subscribed to {question_topic}, Publishing to {answer_topic}, KB Service: {kb_service}, Context: {self.enable_context}'
         )
+
+    def _clear_context_callback(self, request, response):
+        self.conversation_history.clear()
+        response.success = True
+        response.message = '对话历史已清除'
+        self.qa_logger.log_info('qa_core_node', 'Conversation history cleared')
+        return response
+
+    def _add_to_history(self, role: str, content: str) -> None:
+        if not self.enable_context:
+            return
+        
+        self.conversation_history.append({
+            "role": role,
+            "content": content
+        })
+        
+        while len(self.conversation_history) > self.max_history_length * 2:
+            for i, msg in enumerate(self.conversation_history):
+                if msg["role"] != "system":
+                    self.conversation_history.pop(i)
+                    break
 
     def _on_question(self, msg: String) -> None:
         question = msg.data.strip()
@@ -39,7 +68,8 @@ class QACoreNode(Node):
             return
         self.qa_logger.log_message_received('qa_core_node', '/question', question)
         
-        # 发布到内部查询话题传递问题文本
+        self._add_to_history("user", question)
+        
         try:
             m = String()
             m.data = question
@@ -73,6 +103,9 @@ class QACoreNode(Node):
                 ans = self.query_external_api(q)
             if not ans:
                 ans = '抱歉，我现在无法回答这个问题。'
+            
+            self._add_to_history("assistant", ans)
+            
             out = String()
             out.data = ans
             self.answer_pub_.publish(out)
@@ -102,6 +135,9 @@ class QACoreNode(Node):
         ans = self.query_external_api(question)
         if not ans:
             ans = '抱歉，我现在无法回答这个问题。'
+        
+        self._add_to_history("assistant", ans)
+        
         out = String()
         out.data = ans
         self.answer_pub_.publish(out)
@@ -109,19 +145,27 @@ class QACoreNode(Node):
 
     def query_external_api(self, question: str) -> Optional[str]:
         self.url = 'https://spark-api-open.xf-yun.com/v2/chat/completions'
+        
+        messages = [
+            {
+                "role": "system",
+                "content": "你是一个智能助手，能够根据上下文进行连贯的对话。"
+            }
+        ]
+        
+        if self.enable_context and self.conversation_history:
+            messages.extend(self.conversation_history)
+        else:
+            messages.append({
+                "role": "user",
+                "content": question
+            })
+        
         self.data = {
             "max_tokens" : 32768,
             "top_k" : 6,
             "temperature" : 1.2,
-            "messages" : [
-                {"role":"system",
-                 "content":""
-                },
-                {
-                    "role":"user",
-                    "content": question
-                }
-            ],
+            "messages" : messages,
             "model" : "x1",
             "tools" : [
                 {

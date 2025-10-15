@@ -43,6 +43,12 @@ if [ -d "log" ]; then
   echo "[信息] 删除log目录"
 fi
 
+echo "[信息] 清理之前生成的日志文件"
+if [ -d "src/logs" ]; then
+  rm -rf src/logs/*
+  echo "[信息] 删除src/logs目录下的日志文件"
+fi
+
 echo "[信息] 构建包: $PKG_NAME"
 # 检查colcon命令
 if ! command -v colcon >/dev/null 2>&1; then
@@ -127,14 +133,6 @@ trap cleanup EXIT INT TERM
 
 echo "[信息] 启动QA助手"
 WEB_FILE="file://$WS_DIR/src/$PKG_NAME/web/index.html"
-echo "[信息] Web页面: $WEB_FILE"
+echo "[信息] 请在浏览器中打开网页: $WEB_FILE"
 
-# 尝试自动打开网页
-if command -v xdg-open >/dev/null 2>&1; then
-  (xdg-open "$WEB_FILE" >/dev/null 2>&1 || true) &
-elif command -v gio >/dev/null 2>&1; then
-  (gio open "$WEB_FILE" >/dev/null 2>&1 || true) &
-else
-  echo "[信息] 请手动在浏览器中打开网页: $WEB_FILE"
-fi
 ros2 launch "$PKG_NAME" qa_assistant_launch.py
